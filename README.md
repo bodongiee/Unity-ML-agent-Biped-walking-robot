@@ -1,6 +1,6 @@
 # Unity ML-agent Bipedal Robot Walking Project
 
-## Model1(BipedalAgent_1.onnx)
+## Model 1 (BipedalAgent_1.onnx)
 <img src="./Images/model1.gif" width="100%"></img>
 ### Training Info
 | Parameter | Value |
@@ -26,8 +26,34 @@
 - Right Hip, Knee, Ankle
 
 ### Rewards
-- 직립 유지: +0.01 * uprightness
-- 높이 유지: +0.01 * height
-- 전진: +5.0 * progress
-- 목표 도달: +10.0
-- 넘어짐: -1.0
+```
+    private void CheckRewards() {
+        float currentDistance = Vector3.Distance(baseLink.transform.position, target.position);
+        float upright = Vector3.Dot(baseLink.transform.up, Vector3.up);
+
+        // 1. 넘어짐 체크
+        if (upright < 0.4f) {
+            AddReward(-1f);
+            EndEpisode();
+            return;
+        }
+        // 2. 서있는 보상
+        AddReward(upright * 0.01f);
+
+        // 3. 높이 유지 보상
+        float heightReward = Mathf.Clamp(baseLink.transform.position.y, 0f, 1f) * 0.01f;
+        AddReward(heightReward);
+
+        // 4. 전진 보상
+        float progress = previousDistanceToTarget - currentDistance;
+        AddReward(progress * 5f);
+
+        previousDistanceToTarget = currentDistance;
+
+        // 5. 목표 도달
+        if (currentDistance < 0.5f) {
+            AddReward(10f);
+            EndEpisode();
+        }
+    }
+```
