@@ -1,4 +1,4 @@
 # Unity ML-agent Bipedal Robot Walking Project
 
 # Model1
-![alt text](<./Images/model1.gif>)
+<img src="./Images/model1.gif" width="100%">
