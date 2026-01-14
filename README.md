@@ -26,6 +26,11 @@
 - Right Hip, Knee, Ankle
 
 ### Rewards
++ 직립 유지: +0.01 * uprightness
++ 높이 유지: +0.01 * height
++ 전진: +5.0 * progress
++ 목표 도달: +10.0
++ 넘어짐: -1.0
 ```
     private void CheckRewards() {
         float currentDistance = Vector3.Distance(baseLink.transform.position, target.position);
