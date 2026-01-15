@@ -1,8 +1,8 @@
 import torch
 import sys
 
-input_path = "results/bipedal_walk_v6/BipedalAgent/BipedalAgent-67390020.pt"
-output_path = "results/bipedal_walk_v6/BipedalAgent/checkpoint_cpu.pt"
+input_path = "results/bipedal_walk_v9/BipedalAgent/BipedalAgent-65846502.pt"
+output_path = "results/bipedal_walk_v9/BipedalAgent/checkpoint_cpu.pt"
 
 print(f"Loading: {input_path}")
 checkpoint = torch.load(input_path, map_location=torch.device('cpu'))

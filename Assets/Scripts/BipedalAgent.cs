@@ -25,7 +25,7 @@ public class BipedalAgent : Agent {
     public float initialHipAngle;
     private Vector3 startPosition;
     private float previousDistanceToTarget;
-
+ 
     // URDF 관절 제한값 (도 단위)
     private readonly float[] jointLowerDeg = { -90f, 0f, -46f, -90f, 0f, -46f };
     private readonly float[] jointUpperDeg = { 90f, 115f, 46f, 90f, 115f, 46f };
@@ -84,19 +84,29 @@ public class BipedalAgent : Agent {
 
     public override void OnEpisodeBegin() {
         ResetRobotPose();
+
         if (target != null && baseLink != null) {
+            float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
+            
+            float distance = Random.Range(2f, 10f);
+            Vector3 randomOffset = new Vector3(Mathf.Cos(angle) * distance, 0f, Mathf.Sin(angle) * distance);
+            target.position = startPosition + randomOffset;
+
             previousDistanceToTarget = Vector3.Distance(baseLink.transform.position, target.position);
         }
     }
 
-
+//UnityEditor.TransformWorldPlacementJSON:{"position":{"x":0.0,"y":0.7670000195503235,"z":0.0},"rotation":{"x":0.0,"y":0.0,"z":0.0,"w":1.0},"scale":{"x":0.5,"y":0.20000000298023225,"z":0.25}}
     public override void CollectObservations(VectorSensor sensor) {
         //타겟과의 거리 -> 1
-        sensor.AddObservation(Vector3.Distance(baseLink.transform.position, target.position) / 1f);
-        //타겟 방향 -> 2
+        sensor.AddObservation(Vector3.Distance(baseLink.transform.position, target.position) / 10f);
+
+        //타겟 방향 (로봇 기준 로컬 좌표) -> 2
         Vector3 toTarget = (target.position - baseLink.transform.position).normalized;
-        sensor.AddObservation(toTarget.x);
-        sensor.AddObservation(toTarget.z);
+        Vector3 localDir = baseLink.transform.InverseTransformDirection(toTarget);
+        sensor.AddObservation(localDir.x);  // 로봇 기준 좌우
+        sensor.AddObservation(localDir.z);  // 로봇 기준 앞뒤
+
         //로봇이 서있는 정도 -> 1
         sensor.AddObservation(Vector3.Dot(baseLink.transform.up, Vector3.up)); // Uprightness
         //각 관절 현재 각도 -> 6
@@ -108,6 +118,7 @@ public class BipedalAgent : Agent {
     public override void OnActionReceived(ActionBuffers actions) {
         var cont = actions.ContinuousActions;
 
+
         for (int i = 0; i < joints.Length; i++) {
             if (joints[i] == null) continue;
 
@@ -116,7 +127,7 @@ public class BipedalAgent : Agent {
             if (i == 2 || i == 5) bias = initialAnkleAngle;
             else if (i == 0 || i == 3) bias = initialHipAngle;
 
-            float targetAngle = bias + (cont[i] * 40f); 
+            float targetAngle = bias + (cont[i] * 40f);
             targetAngle = Mathf.Clamp(targetAngle, lowerLimits[i], upperLimits[i]);
 
             var drive = joints[i].xDrive;
@@ -132,32 +143,34 @@ public class BipedalAgent : Agent {
         float upright = Vector3.Dot(baseLink.transform.up, Vector3.up);
 
         // 1. 넘어짐 체크
-        if (upright < 0.4f) {
-            AddReward(-1f);
+        if (upright < 0.3f) {
+            AddReward(-2f);
             EndEpisode();
             return;
         }
-        // 2. 서있는 보상
-        AddReward(upright * 0.01f);
 
-        // 3. 높이 유지 보상
-        float heightReward = Mathf.Clamp(baseLink.transform.position.y, 0f, 1f) * 0.01f;
-        AddReward(heightReward);
-
-        // 4. 전진 보상
+        // 2. 전진 보상
         float progress = previousDistanceToTarget - currentDistance;
-        AddReward(progress * 5f);
-
+        AddReward(progress * 10f);
         previousDistanceToTarget = currentDistance;
-        
+
+        // 3. 타겟 방향 보상 (타겟을 향할수록 보상)
+        Vector3 toTarget = (target.position - baseLink.transform.position).normalized;
+        Vector3 forward = baseLink.transform.forward;
+        float facingReward = Vector3.Dot(new Vector3(forward.x, 0, forward.z).normalized, toTarget);
+        AddReward(facingReward * 0.005f);
+
+        // 4. 가만히 있으면 작은 페널티
+        AddReward(-0.001f);
+
         // 5. 목표 도달
         if (currentDistance < 0.5f) {
-            AddReward(10f);
+            AddReward(50f);
             EndEpisode();
         }
     }
 
-        public void HandleGroundCollision() {
+    public void HandleGroundCollision() {
         AddReward(-1f);
         EndEpisode();
     }
