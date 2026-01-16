@@ -12,9 +12,20 @@ public class BipedalAgent : Agent {
     public ArticulationBody rightKneeJoint;
     public ArticulationBody rightAnkleJoint;
     private ArticulationBody[] joints;
-    private ArticulationDrive[] drives;
+    //private ArticulationDrive[] drives;
     private float[] lowerLimits;
     private float[] upperLimits;
+    private float[] previousVelocities = new float[6];  // 관절 가속도 계산용
+
+    private float leftFootAirTime = 0f;
+    private float rightFootAirTime = 0f;
+    private bool leftFootGrounded = true;
+    private bool rightFootGrounded = true;
+    private int targetStaySteps = 0;  // 타겟 영역 체류 스텝 수
+
+    [Header("Foot Contact")]
+    public FootContact leftFoot;
+    public FootContact rightFoot;
 
     [Header("Target & Base")]
     public Transform target;
@@ -27,12 +38,12 @@ public class BipedalAgent : Agent {
     private float previousDistanceToTarget;
  
     // URDF 관절 제한값 (도 단위)
-    private readonly float[] jointLowerDeg = { -90f, 0f, -46f, -90f, 0f, -46f };
-    private readonly float[] jointUpperDeg = { 90f, 115f, 46f, 90f, 115f, 46f };
+    private readonly float[] jointLowerDeg = { -90f, 0f, -65f, -90f, 0f, -65f };
+    private readonly float[] jointUpperDeg = { 90f, 115f, 65f, 90f, 115f, 65f };
 
     public override void Initialize() {
         joints = new ArticulationBody[] { leftHipJoint, leftKneeJoint, leftAnkleJoint, rightHipJoint, rightKneeJoint, rightAnkleJoint };
-        drives = new ArticulationDrive[6];
+        //drives = new ArticulationDrive[6];
         initialAnkleAngle = -8f;
         initialHipAngle = 0f;
         lowerLimits = jointLowerDeg;
@@ -85,6 +96,17 @@ public class BipedalAgent : Agent {
     public override void OnEpisodeBegin() {
         ResetRobotPose();
 
+        // 이전 속도 초기화
+        for (int i = 0; i < 6; i++) {
+            previousVelocities[i] = 0f;
+        }
+        // Time in Air 초기화
+        leftFootAirTime = 0f;
+        rightFootAirTime = 0f;
+        leftFootGrounded = true;
+        rightFootGrounded = true;
+        targetStaySteps = 0;
+
         if (target != null && baseLink != null) {
             float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
             
@@ -113,8 +135,14 @@ public class BipedalAgent : Agent {
         foreach (var j in joints) {
             sensor.AddObservation(j.jointPosition[0]);
         }
-    }
 
+        foreach (var j in joints) {
+            sensor.AddObservation(j.jointVelocity[0] / 30f);
+        }
+
+        sensor.AddObservation(leftFoot != null && leftFoot.isGrounded ? 1f : 0f);
+        sensor.AddObservation(rightFoot != null && rightFoot.isGrounded ? 1f : 0f);
+    }
     public override void OnActionReceived(ActionBuffers actions) {
         var cont = actions.ContinuousActions;
 
@@ -143,8 +171,8 @@ public class BipedalAgent : Agent {
         float upright = Vector3.Dot(baseLink.transform.up, Vector3.up);
 
         // 1. 넘어짐 체크
-        if (upright < 0.3f) {
-            AddReward(-2f);
+        if (upright < 0.5f) {
+            AddReward(-5f);
             EndEpisode();
             return;
         }
@@ -158,16 +186,174 @@ public class BipedalAgent : Agent {
         Vector3 toTarget = (target.position - baseLink.transform.position).normalized;
         Vector3 forward = baseLink.transform.forward;
         float facingReward = Vector3.Dot(new Vector3(forward.x, 0, forward.z).normalized, toTarget);
-        AddReward(facingReward * 0.005f);
+        AddReward(facingReward * 0.01f);
 
         // 4. 가만히 있으면 작은 페널티
-        AddReward(-0.001f);
+        //AddReward(-0.001f);
 
-        // 5. 목표 도달
-        if (currentDistance < 0.5f) {
-            AddReward(50f);
-            EndEpisode();
+        // 5. 감속 보상 (타겟 2m 이내에서 거리에 비례해 감속 유도)
+        float baseSpeed = baseLink.linearVelocity.magnitude;
+        if (currentDistance < 2f) {
+            // 거리가 가까울수록 낮은 속도 요구
+            float allowedSpeed = currentDistance;
+            if (baseSpeed > allowedSpeed) {
+                AddReward((allowedSpeed - baseSpeed) * 0.01f);  // 초과 속도에 페널티
+            }
         }
+
+        // 6. 목표 도달
+        if (currentDistance < 0.5f) {
+            targetStaySteps++;
+
+            float jointSpeed = 0f;
+            foreach (var j in joints) {
+                jointSpeed += Mathf.Abs(j.jointVelocity[0]);
+            }
+
+            // 완전히 정지했으면 큰 보상 + 종료
+            if (baseSpeed < 0.1f && jointSpeed < 1f) {
+                AddReward(50f);
+                EndEpisode();
+            }
+            // 50스텝 (약 3초) 내에 정지 못하면 작은 보상 + 종료
+            else if (targetStaySteps > 50) {
+                AddReward(10f);
+                EndEpisode();
+            }
+        } else {
+            targetStaySteps = 0;  // 타겟 영역 벗어나면 리셋
+        }
+        
+        //UnityEditor.TransformWorldPlacementJSON:{"position":{"x":0.0,"y":0.7670000195503235,"z":0.0},"rotation":{"x":0.0,"y":0.0,"z":0.0,"w":1.0},"scale":{"x":1.0,"y":1.0,"z":1.0}}
+        //============================================================================================
+        //Curriculum Learning
+        //============================================================================================
+        //BipedalAgent-20028066.pt -> Just walking, Tensorboard graph -> plateau
+        
+        //============================================================================================
+        //1차 커리큘럼 업데이트 : 2,000,000+ 스텝에서 사용
+        //============================================================================================
+        //무릎 사용
+        float minKneeAngle = 35f;
+        float maxKneeAngle = 60f;
+        float currentLeftKnee = leftKneeJoint.jointPosition[0] * Mathf.Rad2Deg;
+        float currentRightKnee = rightKneeJoint.jointPosition[0] * Mathf.Rad2Deg;
+
+        float leftKneePenalty = 0f;
+        float rightKneePenalty = 0f;
+        if(currentLeftKnee < minKneeAngle)
+            leftKneePenalty += (minKneeAngle - currentLeftKnee);
+        else if(currentLeftKnee > maxKneeAngle)
+            leftKneePenalty += (currentLeftKnee - maxKneeAngle);
+
+        if(currentRightKnee < minKneeAngle)
+            rightKneePenalty += (minKneeAngle - currentRightKnee);
+        else if(currentRightKnee > maxKneeAngle)
+            rightKneePenalty += (currentRightKnee - maxKneeAngle);                        
+
+        AddReward((leftKneePenalty + rightKneePenalty) * (-0.01f));
+
+        //로봇 높이 조정
+        float maxHeight = 0.6f;
+        float minHeight = 0.3f;
+        float currentPoisition = baseLink.transform.position.y;
+        if(currentPoisition > maxHeight) {
+            AddReward((currentPoisition - maxHeight) * (-0.01f));
+        }
+        else if(currentPoisition < minHeight) {
+            AddReward((minHeight - currentPoisition) * (-0.01f));
+        }
+
+
+        //로봇 베이스 기울기 (수평 유지)
+        float baseAngle = Mathf.Abs(Vector3.Dot(baseLink.transform.forward, Vector3.up));
+        AddReward(-baseAngle * 0.01f);
+
+        /*        
+        //============================================================================================
+        //2차 커리큘럼 업데이트 : 
+        //============================================================================================
+
+        //발 높이 보상 (Expressive Whole-Body Control for Humanoid Robots #1)
+        float targetFootHeight = 0.15f;
+        if(leftFoot != null) {
+            if (!leftFoot.isGrounded) {
+                float footHeight = leftAnkleJoint.transform.position.y;
+                float footHeightDiff = Mathf.Abs(footHeight - targetFootHeight);
+                AddReward(footHeightDiff * (-0.01f));
+
+            }
+        }
+        if(rightFoot != null) {
+            if (!rightFoot.isGrounded) {
+                float footHeight = rightAnkleJoint.transform.position.y;
+                float footHeightDiff = Mathf.Abs(footHeight - targetFootHeight);
+                AddReward(footHeightDiff * (-0.01f));
+
+            }
+        }
+
+        //발 공중  체류 보상 (Expressive Whole-Body Control for Humanoid Robots #2)
+        if(leftFoot != null) {
+            if (!leftFoot.isGrounded) {
+                leftFootAirTime += Time.fixedDeltaTime;
+            }
+            else if (leftFoot.isGrounded && !leftFootGrounded) {
+                float effectiveAirTime = Mathf.Min(leftFootAirTime, 0.6f);
+                AddReward(effectiveAirTime * 0.5f);
+                leftFootAirTime = 0f;
+            }
+            leftFootGrounded = leftFoot.isGrounded;
+        }
+
+        if(rightFoot != null) {
+            if (!rightFoot.isGrounded) {
+                rightFootAirTime += Time.fixedDeltaTime;
+            }
+            else if (rightFoot.isGrounded && !rightFootGrounded) {
+                float effectiveAirTime = Mathf.Min(rightFootAirTime, 0.6f);
+                AddReward(rightFootAirTime * 0.5f);
+                rightFootAirTime = 0f;
+            }
+            rightFootGrounded = rightFoot.isGrounded;
+        }
+        //Drag 페널티 (Expressive Whole-Body Control for Humanoid Robots #3)
+        float dragPenalty = 0f;
+        if(leftFoot != null) {
+            if(leftFoot.isGrounded) {
+                Vector3 footV = leftAnkleJoint.linearVelocity;
+                float horizontalSpeed = new Vector2(footV.x, footV.z).magnitude;
+                dragPenalty += horizontalSpeed;
+            }
+        }
+
+        if(rightFoot != null) {
+            if(rightFoot.isGrounded) {
+                Vector3 footV = rightAnkleJoint.linearVelocity;
+                float horizontalSpeed = new Vector2(footV.x, footV.z).magnitude;
+                dragPenalty += horizontalSpeed;
+            }
+        }
+        AddReward(dragPenalty * (-0.01f));
+
+        //관절 가속도 페널티 (Expressive Whole-Body Control for Humanoid Robots #6)
+        float accPenalty = 0f;
+        for (int i = 0; i < 6; i++) {
+            float acc = (joints[i].jointVelocity[0] - previousVelocities[i]) / Time.fixedDeltaTime;
+            accPenalty += Mathf.Abs(acc);
+            previousVelocities[i] = joints[i].jointVelocity[0];
+        }
+        AddReward(accPenalty * (-0.0001f));
+
+        //수직 선속도 페널티 (Expressive Whole-Body Control for Humanoid Robots #12)
+        float verticalVelocity = baseLink.linearVelocity.y;
+        AddReward(Mathf.Abs(verticalVelocity) * (-0.01f));
+
+        //수평면 각속도 페널티 (Expressive Whole-Body Control for Humanoid Robots #13)
+        float horizontalAngularVelocity = baseLink.angularVelocity.y;
+        AddReward(Mathf.Abs(horizontalAngularVelocity) * (-0.001f));
+        */
+
     }
 
     public void HandleGroundCollision() {
