@@ -22,6 +22,7 @@ public class BipedalAgent : Agent {
     private bool leftFootGrounded = true;
     private bool rightFootGrounded = true;
     private int targetStaySteps = 0;  // 타겟 영역 체류 스텝 수
+    private int stoppingTimer = 0; // Timeout for stopping phase
 
     [Header("Foot Contact")]
     public FootContact leftFoot;
@@ -38,6 +39,10 @@ public class BipedalAgent : Agent {
     private Vector3 startPosition;
     private float previousDistanceToTarget;
  
+    // Gait Parameters
+    private float m_GaitPhase;
+    private float m_GaitPeriod = 0.8f; // Seconds per cycle
+
     // URDF 관절 제한값 (도 단위) - 오리걸음용
     // Hip: 0~-90 (앞으로만), Knee: 0~115, Ankle: -65~65
     private readonly float[] jointLowerDeg = { -90f, 0f, -65f, -90f, 0f, -65f };
@@ -79,6 +84,7 @@ public class BipedalAgent : Agent {
     }
 
     private void ResetRobotPose() {
+        m_GaitPhase = 0f; // Reset phase
         for (int i = 0; i < joints.Length; i++) {
             if (joints[i] == null) continue;
 
@@ -94,7 +100,6 @@ public class BipedalAgent : Agent {
 
             joints[i].jointPosition = new ArticulationReducedSpace(targetDeg * Mathf.Deg2Rad);
             joints[i].jointVelocity = new ArticulationReducedSpace(0f);
-
         }
 
         if (baseLink != null) {
@@ -111,7 +116,6 @@ public class BipedalAgent : Agent {
         for (int i = 0; i < 6; i++) {
             previousVelocities[i] = 0f;
         }
-        // Time in Air 초기화
         leftFootAirTime = 0f;
         rightFootAirTime = 0f;
         leftFootGrounded = true;
@@ -144,6 +148,11 @@ public class BipedalAgent : Agent {
         //로봇이 서있는 정도 -> 1
         sensor.AddObservation(Vector3.Dot(baseLink.transform.up, Vector3.up)); 
 
+        // GAIT PHASE Signals -> 2
+        float phase = m_GaitPhase * 2 * Mathf.PI;
+        sensor.AddObservation(Mathf.Sin(phase)); 
+        sensor.AddObservation(Mathf.Cos(phase));
+
         //각 관절 현재 각도 -> 6
         foreach (var j in joints) {
             sensor.AddObservation(j.jointPosition[0]);
@@ -160,6 +169,10 @@ public class BipedalAgent : Agent {
     }
 
     public override void OnActionReceived(ActionBuffers actions) {
+        // Update Phase
+        m_GaitPhase += Time.fixedDeltaTime / m_GaitPeriod;
+        m_GaitPhase %= 1f;
+
         var cont = actions.ContinuousActions;
 
 
@@ -172,7 +185,10 @@ public class BipedalAgent : Agent {
             else if (i == 1 || i == 4) bias = initialKneeAngle; // Knee
             else if (i == 2 || i == 5) bias = initialAnkleAngle; // Ankle
 
-            float targetAngle = bias + (cont[i] * 40f);
+            float actionScale = 40f;
+            if (i == 0 || i == 3) actionScale = 60f; // Increased Hip Range
+
+            float targetAngle = bias + (cont[i] * actionScale);
             targetAngle = Mathf.Clamp(targetAngle, lowerLimits[i], upperLimits[i]);
 
             var drive = joints[i].xDrive;
@@ -186,138 +202,113 @@ public class BipedalAgent : Agent {
     private void CheckRewards() {
         float currentDistance = Vector3.Distance(baseLink.transform.position, target.position);
         float upright = Vector3.Dot(baseLink.transform.up, Vector3.up);
+        Vector3 toTarget = (target.position - baseLink.transform.position).normalized;
+        Vector3 forward = baseLink.transform.forward;
+        Vector3 forwardFlat = new Vector3(forward.x, 0, forward.z).normalized;
 
-        // 1. 넘어짐 체크
+        // 1. Survival & Upright
         if (upright < 0.5f) {
             AddReward(-5f);
             EndEpisode();
             return;
         }
+        AddReward(0.01f); // Existing reward
 
-        // 2. 타겟 방향 계산
-        Vector3 toTarget = (target.position - baseLink.transform.position).normalized;
-        Vector3 forward = baseLink.transform.forward;
-        float facingReward = Vector3.Dot(new Vector3(forward.x, 0, forward.z).normalized, toTarget);
+        // 2. Navigation State Machine
+        float angleToTarget = Vector3.Angle(forwardFlat, toTarget);
+        bool needsTurn = angleToTarget > 15f; // Tightened to 15 degrees (Strict)
+        bool isStopping = currentDistance < 0.5f;
 
-        // 3. 전진 보상 (앞을 향할 때만)
-        float progress = previousDistanceToTarget - currentDistance;
-        if (facingReward > 0.7f) {
-            AddReward(progress * 10f);
-        // 백스텝으로 가면 페널티
-        } else if (facingReward < -0.7f && progress > 0) {
-            AddReward(-0.1f);
-        }
-        previousDistanceToTarget = currentDistance;
+        if (isStopping) {
+            // STOPPING MODE
+            float velocity = baseLink.linearVelocity.magnitude;
+            
+            // Penalize movement VERY HEAVILY
+            AddReward(-0.2f * velocity); 
+            
+            // Penalize angular velocity too
+            AddReward(-0.1f * baseLink.angularVelocity.magnitude);
 
-
-        // 4. 가만히 있으면 작은 페널티 (타겟 근처가 아닐 때만)
-        if (currentDistance > 2f) {
-            float speed = baseLink.linearVelocity.magnitude;
-            if (speed < 0.1f) {
-                AddReward(-0.01f);
+            // Count stable steps (velocity < 0.2)
+            if (velocity < 0.2f) {
+                targetStaySteps++;
+            } else {
+                targetStaySteps = Mathf.Max(0, targetStaySteps - 2); // Decay faster
             }
-        }
-
-        // 5. 감속 보상 (타겟 2m 이내에서 거리에 비례해 감속 유도)
-        float baseSpeed = baseLink.linearVelocity.magnitude;
-        if (currentDistance < 2f) {
-            // 거리가 가까울수록 낮은 속도 요구
-            float allowedSpeed = currentDistance;
-            if (baseSpeed > allowedSpeed) {
-                AddReward((allowedSpeed - baseSpeed) * 0.1f);  // 0.01f → 0.1f 강화
-            }
-        }
-
-        // Stability Assist at Target
-        if (currentDistance < 0.5f) {
-            if(upright > 0.8f) AddReward(0.05f); 
-            else AddReward(-0.05f); // Force stability when stopping
-        }
-
-        // 6. 목표 도달
-        if (currentDistance < 0.5f) {
-            targetStaySteps++;
-
-            float jointSpeed = 0f;
-            foreach (var j in joints) {
-                jointSpeed += Mathf.Abs(j.jointVelocity[0]);
+            
+            // ABSOLUTE TIMEOUT: Force end after 200 steps in zone regardless of state
+            stoppingTimer++;
+            if (stoppingTimer > 200) {
+                // Partial reward based on how stable it was
+                float partialReward = Mathf.Clamp(targetStaySteps * 0.5f, 0f, 30f);
+                AddReward(partialReward - 2f); // Small penalty for not fully stopping
+                EndEpisode();
+                return;
             }
 
-            // 완전히 정지했으면 큰 보상 + 종료
-            // Guidance to stop: Reward for low velocity when close
-            AddReward(Mathf.Clamp01(1f - baseSpeed) * 0.1f);
-
-            // STOPPING LOGIC FIX:
-            // If stayed for 50 steps (approx 1s), count as success regardless of perfect zero velocity.
+            // SUCCESS: Full reward for staying completely still
             if (targetStaySteps > 50) {
-                 AddReward(50f);
-                 EndEpisode();
-            }
-            // Strict stop bonus (optional)
-            else if (baseSpeed < 0.1f && jointSpeed < 1f) {
                 AddReward(50f);
                 EndEpisode();
+                return;
             }
-        } else {
-            targetStaySteps = 0;  // 타겟 영역 벗어나면 리셋
-        }
-        
-        //UnityEditor.TransformWorldPlacementJSON:{"position":{"x":0.0,"y":0.7670000195503235,"z":0.0},"rotation":{"x":0.0,"y":0.0,"z":0.0,"w":1.0},"scale":{"x":1.0,"y":1.0,"z":1.0}}
-        //============================================================================================
-        // Duck Walk Curriculum Learning
-        //============================================================================================
-        int currentStep = Academy.Instance.StepCount;
-
-        // Phase 2: Crouch Height Maintenance (After 5M steps)
-        if(currentStep == 5000000) {
-            Debug.Log("=====================================================");
-            Debug.Log("Phase 2: Crouch Height Maintenance (After 5M steps)");
-            Debug.Log("=====================================================");
-        }
-        if (currentStep > 5000000) {
-            float targetHeight = 0.65f;
-            float currentHeight = baseLink.transform.position.y;
-            float heightError = Mathf.Abs(currentHeight - targetHeight);
-            AddReward(Mathf.Exp(-5f * heightError) * 0.1f);
+        } 
+        else {
+            // Reset ALL counters when leaving zone (prevents re-entry farming)
+            if (stoppingTimer > 0) {
+                // Penalty for leaving the zone after entering
+                AddReward(-0.5f);
+            }
+            stoppingTimer = 0;
+            targetStaySteps = 0;
             
-            // Explicit Penalty for being too high (Prevent lifting/tiptoes)
-            if(currentHeight > 0.75f) {
-                AddReward((0.75f - currentHeight) * 0.1f);
+            if (needsTurn) {
+                // TURNING MODE (Priority)
+                float turnReward = Vector3.Dot(forwardFlat, toTarget); 
+                AddReward(turnReward * 0.1f);
+                
+                // Strict penalty for moving forward while turning
+                float fwdVel = Vector3.Dot(baseLink.linearVelocity, forwardFlat);
+                if(fwdVel > 0.1f) AddReward(-0.05f); 
+            } 
+            else {
+                // WALKING MODE
+                // Progress Reward: Only reward reducing distance
+                float progress = previousDistanceToTarget - currentDistance;
+                if (progress > 0) {
+                    AddReward(progress * 30f); 
+                }
             }
         }
 
-        // Phase 3: High Step & Waddle (After 10M steps)
-        if(currentStep == 10000000) {
-            Debug.Log("=====================================================");
-            Debug.Log("Phase 3: High Step & Waddle (After 10M steps)");
-            Debug.Log("=====================================================");
-        }
-        if (currentStep > 10000000) {
-            // High Step Reward
-            float targetStepHeight = 0.25f;
-            
-            if (leftFoot != null && !leftFoot.isGrounded) {
-                 float footH = leftAnkleJoint.transform.position.y;
-                 if(footH > 0.05f) {
-                     float range = Mathf.Clamp01(footH / targetStepHeight);
-                     AddReward(range * 0.05f);
-                 }
-            }
-            if (rightFoot != null && !rightFoot.isGrounded) {
-                 float footH = rightAnkleJoint.transform.position.y;
-                 if(footH > 0.05f) {
-                     float range = Mathf.Clamp01(footH / targetStepHeight);
-                     AddReward(range * 0.05f);
-                 }
-            }
+        // 3. Posture & Gait (ONLY ACTIVE WHEN NOT STOPPING)
+        if (!isStopping) {
+            // Posture
+            Vector3 localUp = baseLink.transform.InverseTransformDirection(Vector3.up);
+            if (localUp.z < -0.1f) AddReward(localUp.z * 0.1f); 
+            AddReward(-0.001f * baseLink.angularVelocity.magnitude);
 
-            // Hip Usage / Shuffle Prevention
-            float hipVelocitySum = Mathf.Abs(leftHipJoint.jointVelocity[0]) + Mathf.Abs(rightHipJoint.jointVelocity[0]);
-            if (baseLink.linearVelocity.magnitude > 0.1f) {
-                 AddReward(Mathf.Clamp01(hipVelocitySum) * 0.02f);
+            // Cyclic Gait
+            bool leftShouldSupport = (m_GaitPhase >= 0.5f);
+            bool rightShouldSupport = (m_GaitPhase < 0.5f);
+
+            float contactReward = 0f;
+            if (leftFoot != null && leftFoot.isGrounded == leftShouldSupport) contactReward += 0.1f;
+            if (rightFoot != null && rightFoot.isGrounded == rightShouldSupport) contactReward += 0.1f;
+            AddReward(contactReward);
+
+            // Hip Swing Reward
+            if (!leftShouldSupport && leftFoot != null) {
+                float swingVel = Vector3.Dot(leftAnkleJoint.linearVelocity, forwardFlat);
+                if(swingVel > 0) AddReward(swingVel * 0.05f);
+            }
+            if (!rightShouldSupport && rightFoot != null) {
+                float swingVel = Vector3.Dot(rightAnkleJoint.linearVelocity, forwardFlat);
+                if(swingVel > 0) AddReward(swingVel * 0.05f);
             }
         }
 
+        previousDistanceToTarget = currentDistance;
     }
 
     public void HandleGroundCollision() {

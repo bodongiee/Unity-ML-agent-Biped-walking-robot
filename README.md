@@ -1,5 +1,24 @@
 # Unity ML-agent Bipedal Robot Walking Project
+## Model 3 (BipedalAgent_3.onnx)
 
+<img src="./Images/model3.gif" width="100%"></img>
+
+<div style="text-align: center;">
+    <img src="./Images/URDF1.png" width="49%" />
+    <img src="./Images/URDF2.png" width="49%" />
+</div>
+
+
+### Modification Info
+```
+    private readonly float[] jointLowerDeg = { -90f, 0f, -65f, -90f, 0f, -65f };
+    private readonly float[] jointUpperDeg = { 0f, 115f, 65f, 0f, 115f, 65f };
+```
++ The range of motion of the hip joint was restricted to the anterior direction only
++ Changed center of Mass in URDF, Increased foot size
+
+### Rewards
++ See **BipedalAgent.cs**
 ## Model 2 (BipedalAgent_2.onnx)
 <img src="./Images/model2.gif" width="100%"></img>
 로봇 뒤에 위치한 Target에 대해 불안정하다
