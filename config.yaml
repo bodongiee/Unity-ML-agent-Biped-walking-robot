@@ -18,7 +18,29 @@ behaviors:
       extrinsic:
         gamma: 0.99
         strength: 1.0
-    max_steps: 52000000
-    time_horizon: 500
+    max_steps: 50000000       
+    time_horizon: 512
     summary_freq: 10000
-    checkpoint_interval: 100000000000
+    checkpoint_interval: 50000000  
+
+environment_parameters:
+  education_phase:
+    curriculum:
+      - name: Phase_0_StartWalking
+        completion_criteria:
+          measure: progress
+          behavior: BipedalAgent_v3
+          min_lesson_length: 100
+          threshold: 0.25        # 12.5M 스텝 (50M의 25%)
+        value: 0.0
+        
+      - name: Phase_1_ImproveGait
+        completion_criteria:
+          measure: progress
+          behavior: BipedalAgent_v3
+          min_lesson_length: 100
+          threshold: 0.45        # 22.5M 스텝까지 (추가 10M)
+        value: 1.0
+        
+      - name: Phase_2_TargetSpeed
+        value: 2.0               # 22.5M ~ 50M (나머지)

@@ -4,8 +4,7 @@ using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
 using System.Collections.Generic;
 
-
-public class BipedalAgent_v3 : Agent {
+public class BipedalAgent_v2_5 : Agent {
     // =====================================================================
     // ====== LEFT JOINTS =====
     // =====================================================================
@@ -80,7 +79,6 @@ public class BipedalAgent_v3 : Agent {
     private float stopRadius = 0.5f;
     private float stopRadiusTight = 0.05f;
     private float stopSpeedThreshold = 0.1f;
-    private int currentPhase = 0;  // 현재 커리큘럼 단계
     // ===================================================================
     // ===== Pose =====
     // ===================================================================
@@ -101,11 +99,9 @@ public class BipedalAgent_v3 : Agent {
     // ===================================================================
     // ===== Reward Scale =====
     // ===================================================================
-    private float scale_forward_velocity = 10f;  // 10 -> 25 증가
-    private float scale_forward_progress = 0f;
+    private float scale_distance_progress = 0;
+    private float scale_forward_velocity = 25f;  // 10 -> 25 증가
     private float scale_latera_velocity = 5f;
-    private float scale_single_support = 0.5f;
-    private float scale_swing_clearance = 0.1f;    
     private float scale_yaw = 3f;
     private float scale_feet_orientation = 2f;
     private float scale_feet_contact_number = 3f;
@@ -126,9 +122,6 @@ public class BipedalAgent_v3 : Agent {
     private float scale_default_joint_pos = 4f;
     private float scale_feet_spacing = 2f;
     private float scale_stepLength_TD = 2f;
-    private float scale_com_lateral = 0f;
-    private float scale_any_foot_linf_height = 0f;
-    private float scale_joint_limit = 0f;
     // ===================================================================
     // ===== Swing Parameters =====
     // ===================================================================
@@ -150,193 +143,9 @@ public class BipedalAgent_v3 : Agent {
 
     }
     // ===================================================================
-    // ===== Curriculum Setting =====
-    // ===================================================================
-    private void ApplyCurriculumSettings(int phase) {
-        ResetCurriculumSettings();
-        currentPhase = phase;
-        
-        switch(phase) {
-            case 0: // Phase 0: 동적 보행 시작 (Dynamic Walk)
-                targetWalkingSpeed = 0.3f;  
-                actionScale = 15f;
-                movementDuration = 25f;
-                m_GaitPeriod = 1.2f; 
-                
-                //LOCOMOTION
-                scale_forward_velocity = 8f;
-                scale_forward_progress = 20f;
-                scale_latera_velocity = 3f;
-                scale_yaw = 8f;
-                scale_standing_penalty = 0f;
-
-                //CLOCK-FREE
-                scale_single_support = 4f;
-                scale_any_foot_linf_height = 3f;
-
-                //CLOCK-BASED
-                scale_feet_contact_number = 1f;
-                scale_feet_swingY = 3f;
-                scale_feet_dswingY = 0f;
-                scale_feet_dswingX = 0f;
-                scale_virtual_leg_sym = 0f;
-                scale_virtual_leg_sym_cont = 0f;
-                scale_stepLength_TD = 0f;
-
-                //GAIT QUALITY
-                scale_feet_orientation = 0f;
-                scale_grounded_feet_flat = 0f;
-                scale_feet_spacing = 0f;
-                scale_feet_slip = 0f;
-                scale_default_joint_pos = 0f;
-
-                //STABILITY
-                scale_orientation = 8f;
-                scale_orientation_l2 = -4f;
-                scale_base_height = 5f;
-                scale_com_lateral = 0f;
-                scale_base_acc = 0f;
-
-                //SMOOTHNESS
-                scale_action_smoothness = -0.15f;
-                scale_dof_vel = 0f;
-                scale_joint_limit = 3f;
-                break;
-
-            case 1:
-                targetWalkingSpeed = 0.45f;  
-                actionScale = 20f;
-                movementDuration = 30f;
-                m_GaitPeriod = 1.2f; 
-                
-                //LOCOMOTION
-                scale_forward_velocity = 15f;
-                scale_forward_progress = 15f;
-                scale_latera_velocity = 4f;
-                scale_yaw = 5f;
-                scale_standing_penalty = 0f;
-
-                //CLOCK-FREE
-                scale_single_support = 3f;
-                scale_any_foot_linf_height = 4f;
-
-                //CLOCK-BASED
-                scale_feet_contact_number = 2f;
-                scale_feet_swingY = 6f;
-                scale_feet_dswingY = 1f;
-                scale_feet_dswingX = 0f;
-                scale_virtual_leg_sym = 20f;
-                scale_virtual_leg_sym_cont = 0f;
-                scale_stepLength_TD = 0f;
-
-                //GAIT QUALITY
-                scale_feet_orientation = 0f;
-                scale_grounded_feet_flat = 0f;
-                scale_feet_spacing = 0f;
-                scale_feet_slip = -0.05f;
-                scale_default_joint_pos = 0f;
-
-                //STABILITY
-                scale_orientation = 6f;
-                scale_orientation_l2 = -5f;
-                scale_base_height = 5f;
-                scale_com_lateral = 0f;
-                scale_base_acc = 0f;
-
-                //SMOOTHNESS
-                scale_action_smoothness = -0.2f;
-                scale_dof_vel = 0f;
-                scale_joint_limit = 3f;
-                break;
-            
-            case 2: // Phase 2: 목표 속도 (Target Speed)
-                targetWalkingSpeed = 0.6f;  
-                actionScale = 25f;
-                movementDuration = 40f;
-                m_GaitPeriod = 1.2f; 
-                
-                //LOCOMOTION
-                scale_forward_velocity = 20f;
-                scale_forward_progress = 10f;
-                scale_latera_velocity = 5f;
-                scale_yaw = 3f;
-                scale_standing_penalty = 0f;
-
-                //CLOCK-FREE
-                scale_single_support = 2f;
-                scale_any_foot_linf_height = 2f;
-
-                //CLOCK-BASED
-                scale_feet_contact_number = 3f;
-                scale_feet_swingY = 10f;
-                scale_feet_dswingY = 1.5f;
-                scale_feet_dswingX = 3f;
-                scale_virtual_leg_sym = 55f;
-                scale_virtual_leg_sym_cont = 1.2f;
-                scale_stepLength_TD = 2f;
-
-                //GAIT QUALITY
-                scale_feet_orientation = 2f;
-                scale_grounded_feet_flat = -2f;
-                scale_feet_spacing = 2f;
-                scale_feet_slip = - 0.1f;
-                scale_default_joint_pos = 4f;
-
-                //STABILITY
-                scale_orientation = 3f;
-                scale_orientation_l2 = -6f;
-                scale_base_height = 4f;
-                scale_com_lateral = 1f;
-                scale_base_acc = 0.2f;
-
-                //SMOOTHNESS
-                scale_action_smoothness = -0.2f;
-                scale_dof_vel = -54-4f;
-                scale_joint_limit = 2f;
-                break;
-        }
-        Debug.Log($"현재 학습 단계: Phase {phase}, 목표속도: {targetWalkingSpeed} m/s, GaitPeriod: {m_GaitPeriod}s");
-    }
-    
-    private void ResetCurriculumSettings() {
-        scale_forward_velocity = 0f;  // 10 -> 25 증가
-        scale_forward_progress = 0f;
-        scale_latera_velocity = 0f;
-        scale_single_support = 0f;
-        scale_swing_clearance = 0f;    
-        scale_yaw = 0f;
-        scale_feet_orientation = 0f;
-        scale_feet_contact_number = 0f;
-        scale_grounded_feet_flat = 0f;
-        scale_feet_swingY = 0f;
-        scale_feet_dswingY = 0f;
-        scale_feet_dswingX = 0f;
-        scale_virtual_leg_sym = 0f;
-        scale_virtual_leg_sym_cont = 0f;
-        scale_orientation = 0f;
-        scale_orientation_l2 = 0f;
-        scale_base_height = 0f;
-        scale_action_smoothness = 0f;
-        scale_base_acc = 0f;
-        scale_feet_slip = 0f;
-        scale_dof_vel = 0f;
-        scale_standing_penalty = 0f;  // 제자리 서있기 penalty (5 -> 2 완화)
-        scale_default_joint_pos = 0f;
-        scale_feet_spacing = 0f;
-        scale_stepLength_TD = 0f;
-        scale_com_lateral = 0f;
-        scale_any_foot_linf_height = 0f;
-        scale_joint_limit = 0f;
-    }
-    // ===================================================================
     // ===== Episode Begin =====
     // ===================================================================
     public override void OnEpisodeBegin() {
-        // ===== Curriculum Choice =====
-        float phaseValue = Academy.Instance.EnvironmentParameters.GetWithDefault("education_phase", 0f);
-        int currentPhase = (int)phaseValue;
-        ApplyCurriculumSettings(currentPhase);
-
         // ===== Reset Initial Rocation =====
         Vector3 centerPos = Ground.position;
         centerPos.y = initialBaseHeight;
@@ -514,9 +323,8 @@ public class BipedalAgent_v3 : Agent {
 
         // ===== 2. Locomotion (ONLY when not near target) =====
         if (!nearTarget) {
+            totalReward += RewardDistanceProgress() * scale_distance_progress;
             totalReward += RewardForwardVelocity() * scale_forward_velocity;
-            totalReward += RewardForwardProgress() * scale_forward_progress;
-            totalReward += RewardSingleSupport() * scale_single_support;
             totalReward += RewardLateralVelocity() * scale_latera_velocity;
             totalReward += RewardYaw() * scale_yaw;
 
@@ -532,21 +340,18 @@ public class BipedalAgent_v3 : Agent {
             totalReward += RewardStepLengthTD() * scale_stepLength_TD;
 
             totalReward += RewardStandingPenalty() * scale_standing_penalty;
-            totalReward += RewardJointLimit() * 2f; // 관절 제한 (항상 체크해도 되지만 일단 locomotion에)
         }
 
         // ===== 3. Stability (ALWAYS) =====
         totalReward += RewardOrientation() * scale_orientation;
         totalReward += RewardFlatOrientationL2() * scale_orientation_l2;
         totalReward += RewardActionSmoothness(currentActions) * scale_action_smoothness;
-        totalReward += RewardCOMLateral() * scale_com_lateral;
         totalReward += RewardBaseHeight() * scale_base_height;
         totalReward += RewardBaseAcc() * scale_base_acc;
         totalReward += RewardDofVel() * scale_dof_vel;
         totalReward += RewardFeetSlip() * scale_feet_slip;
         totalReward += RewardDefaultJointPos() * scale_default_joint_pos;
-        totalReward += RewardAnyFootLinfHeight() * scale_any_foot_linf_height;
-        totalReward += RewardJointLimit() * scale_joint_limit;
+
         // ===== 4. Stop reward =====
         if (nearTarget) {
             float stopReward = Mathf.Exp(-speed * 5f);
@@ -571,7 +376,7 @@ public class BipedalAgent_v3 : Agent {
             EndEpisode();
             return;
         }
-        // ===== 2. No progress (all phases involve walking now) =====
+        // ===== 2. No progress (ONLY when far from target) =====
         if (distToTarget > stopRadius) {
             if (distToTarget >= lastDistToTarget - 0.01f) {
                 noProgressTimer += Time.fixedDeltaTime;
@@ -579,27 +384,18 @@ public class BipedalAgent_v3 : Agent {
             else {
                 noProgressTimer = 0f;
             }
-            
-            // Phase 0에서는 더 관대하게 (7초), 나머지는 5초
-            float noProgressLimit = (currentPhase == 0) ? 7f : 5f;
-            if (noProgressTimer > noProgressLimit) {
-                AddReward(-5f);
-                EndEpisode();
-                return;
-            }
         }
         else {
             noProgressTimer = 0f;
         }
-        
+        if (noProgressTimer > 5f) {
+            AddReward(-5f);
+            EndEpisode();
+            return;
+        }
         // ===== 3. Time out =====
         if (movementTimer > movementDuration) {
-            // Phase 0: 시간 끝나면 작은 보너스 (느린 걷기 학습 중)
-            if (currentPhase == 0) {
-                AddReward(2f);  // 생존 보너스
-            }
-            // Phase 1, 2: 타겟 도달 못하면 페널티
-            else if (distToTarget > stopRadius) {
+            if (distToTarget > stopRadius) {
                 AddReward(-10f);
             }
             EndEpisode();
@@ -613,60 +409,13 @@ public class BipedalAgent_v3 : Agent {
     // ===================================================================
     private void RewardSurvival() {
         float upright = Vector3.Dot(baseLink.transform.up, Vector3.up);
-        if(upright < 0.3f) {
+        if(upright < 0.5f) {
             AddReward(-5f);
             EndEpisode();
             return;
         }
     }
 
-    private float GetClockWeight() {
-        float speed = baseLink.linearVelocity.magnitude;
-        return Mathf.Clamp01((speed - 0.1f) / 0.2f);
-    }
-
-    private float RewardCOMLateral() {
-        Vector3 CoM = baseLink.worldCenterOfMass;
-        float x = baseLink.transform.InverseTransformPoint(CoM).x;
-        return Mathf.Exp(-x * x * 20f);
-    }
-
-    private float RewardSingleSupport() {
-        bool leftGrounded = (leftFoot != null && leftFoot.isGrounded);
-        bool rightGrounded = (rightFoot != null && rightFoot.isGrounded);
-        if (leftGrounded ^ rightGrounded)
-            return 1.0f;
-        else if (leftGrounded && rightGrounded)
-            return 0f;
-        else
-            return -1f;
-    }
-
-    private float RewardAnyFootLinfHeight() {
-        bool leftGrounded = (leftFoot != null && leftFoot.isGrounded);
-        bool rightGrounded = (rightFoot != null && rightFoot.isGrounded);
-        if (!leftGrounded && !rightGrounded)
-            return -1f;
-        float ly = leftAnkleRoll.transform.position.y;
-        float ry = rightAnkleRoll.transform.position.y;
-
-        float reward = 0f;
-        if (leftGrounded && !rightGrounded) {
-            reward = Mathf.Exp(-Mathf.Abs(ry-0.08f) * 15f);
-        }
-        else if (rightGrounded && !leftGrounded) {
-            reward = Mathf.Exp(-Mathf.Abs(ly-0.08f) * 15f);
-        }
-        return reward;
-    }
-
-    private float RewardForwardProgress() {
-        Vector3 toTarget = targetPos - baseLink.transform.position;
-        toTarget.y = 0;
-        float currentDist = toTarget.magnitude;
-        float progress = lastDistToTarget - currentDist;
-        return progress * 10f;
-    }
     private float RewardForwardVelocity() {
         Vector3 toTarget = targetPos - baseLink.transform.position;
         toTarget.y = 0;
@@ -678,20 +427,24 @@ public class BipedalAgent_v3 : Agent {
         // 타겟 방향 속도 스칼라
         float velTowardTarget = Vector3.Dot(currentVel, targetDir);
 
-        float linearReward = velTowardTarget * 2f;
-
         float velError = velTowardTarget - targetWalkingSpeed;
-        float expReward = Mathf.Exp(-Mathf.Abs(velError) * 3f);
+        float reward = Mathf.Exp(-Mathf.Abs(velError) * 2f);
 
         Vector3 lastVel = lastBaseVelocity;
         lastVel.y = 0;
         float lastVelTowardTarget = Vector3.Dot(lastVel, targetDir);
-        float velPenalty = Mathf.Abs(lastVelTowardTarget - velTowardTarget) * 1f;                                   
 
-        return linearReward + expReward - velPenalty;
+        float penalty = Mathf.Abs(lastVelTowardTarget - velTowardTarget) * 2f;   //velError * velError * 0.5f;
+
+        return reward - penalty;
     }
-
-
+    private float RewardDistanceProgress() {
+        Vector3 toTarget = targetPos - baseLink.transform.position;
+        toTarget.y = 0;
+        float currentDist = toTarget.magnitude;
+        float progress = lastDistToTarget - currentDist;
+        return progress * 10f;
+    }
     private float RewardLateralVelocity() {
         Vector3 toTarget = targetPos - baseLink.transform.position;
         toTarget.y = 0;
@@ -707,14 +460,9 @@ public class BipedalAgent_v3 : Agent {
     }
 
     private float RewardYaw() {
-        Vector3 toTarget = targetPos - baseLink.transform.position;
-        toTarget.y = 0;
-
-        if (toTarget.magnitude < 0.1f) return 1f;
-
-        float desiredYaw = Mathf.Atan2(toTarget.x, toTarget.z) * Mathf.Rad2Deg;
         float currentYaw = baseLink.transform.eulerAngles.y;
-        float yawError = Mathf.Abs(Mathf.DeltaAngle(currentYaw, desiredYaw));
+        float initialYaw = startRot.eulerAngles.y;
+        float yawError = Mathf.Abs(Mathf.DeltaAngle(currentYaw, initialYaw));
         return Mathf.Exp(-yawError * 0.05f);
     }
 
@@ -775,9 +523,6 @@ public class BipedalAgent_v3 : Agent {
         return Mathf.Exp(-totalVariance * 100f);
     }
     private float RewardFeetContactNumber() {
-        float clockWeight = GetClockWeight();
-        if (clockWeight < 0.01f) return 0f;
-
         bool leftStance = (m_GaitPhase >= 0.5f);
         bool rightStance = (m_GaitPhase < 0.5f);
 
@@ -785,16 +530,13 @@ public class BipedalAgent_v3 : Agent {
         bool rightContact = (rightFoot != null && rightFoot.isGrounded);
 
         float reward = 0f;
-        reward += (leftContact == leftStance) ? 1f : -0.3f;
-        reward += (rightContact == rightStance) ? 1f : -0.3f;
+        reward += (leftContact == leftStance) ? 2f : -0.3f;
+        reward += (rightContact == rightStance) ? 2f : -0.3f;
 
-        return reward * clockWeight;
+        return reward * 0.5f;
     }
 
     private float RewardFeetSwingY() {
-        float clockWeight = GetClockWeight();
-        if (clockWeight < 0.01f) return 0f;
-
         bool leftSwing = (m_GaitPhase < 0.5f);
         bool rightSwing = (m_GaitPhase >= 0.5f);
 
@@ -804,23 +546,19 @@ public class BipedalAgent_v3 : Agent {
             float footY = leftAnkleRoll.transform.position.y;
             float refY = GetSwingFootTargetHeight();
             float err = Mathf.Abs(footY - refY);
-            // 오차에 더 민감하게 반응 (*80 -> *100)
-            reward += Mathf.Exp(-err * 100f) - 30f * err * err;
+            reward += Mathf.Exp(-err * 80f) - 20f * err * err;
         }
 
         if(rightSwing && rightAnkleRoll != null) {
             float footY = rightAnkleRoll.transform.position.y;
             float refY = GetSwingFootTargetHeight();
             float err = Mathf.Abs(footY - refY);
-            reward += Mathf.Exp(-err * 100f) - 30f * err * err;
+            reward += Mathf.Exp(-err * 80f) - 20f * err * err;
         }
-        return reward * clockWeight;
+        return reward;
     }
     private float RewardFeetDSwingY() {
         float rew = 0f;
-        float clockWeight = GetClockWeight();
-        if (clockWeight < 0.01f) return 0f;
-
         bool leftSwing = (m_GaitPhase < 0.5f);
         bool rightSwing = (m_GaitPhase >= 0.5f);
 
@@ -840,15 +578,12 @@ public class BipedalAgent_v3 : Agent {
             float err = Mathf.Abs(refDY - footDY);
             rew += Mathf.Exp(-err * 5f) - 0.1f * err * err;
         }
-        return rew * clockWeight;
+        return rew;
     }
 
     private float RewardFeetDSwingX() {
         // 스윙 발의 측면(X) 속도를 최소화 - 발이 옆으로 흔들리지 않도록
         float reward = 0f;
-        float clockWeight = GetClockWeight();
-        if (clockWeight < 0.01f) return 0f;
-
         bool leftSwing = (m_GaitPhase < 0.5f);
         bool rightSwing = (m_GaitPhase >= 0.5f);
 
@@ -864,7 +599,7 @@ public class BipedalAgent_v3 : Agent {
             float sqX = localVel.x * localVel.x;
             reward += Mathf.Exp(-sqX * 20f);
         }
-        return reward * clockWeight;
+        return reward;
     }
 
     private Vector3 GetVirtualLeg(Transform hip, Transform ankle) {
@@ -936,9 +671,6 @@ public class BipedalAgent_v3 : Agent {
 
     private float RewardVirtualLegSymCont() {
         float reward = 0f;
-        float clockWeight = GetClockWeight();
-        if (clockWeight < 0.01f) return 0f;
-        
         float swingProgress = (m_GaitPhase < 0.5f) ? (m_GaitPhase * 2f) : ((m_GaitPhase - 0.5f) * 2f);
         bool firstHalf = swingProgress < 0.5f; //발이 뒤에 있어야함
         bool secondHalf = swingProgress >= 0.5f; //발이 앞에 있어야함
@@ -954,7 +686,7 @@ public class BipedalAgent_v3 : Agent {
             if (secondHalf && vLeg.z < 0) reward -= 1f;
                    
         }
-        return reward * clockWeight;
+        return reward;
     }
 
     private float RewardStepLengthTD() {
@@ -1060,9 +792,9 @@ public class BipedalAgent_v3 : Agent {
         float minSpeed = targetWalkingSpeed * 0.3f;  // 최소 0.23 m/s
 
         if (velTowardTarget < minSpeed) {
-            // 속도가 낮을수록 더 큰 penalty (3 -> 10 강화)
+            // 속도가 낮을수록 더 큰 penalty
             float deficit = minSpeed - velTowardTarget;
-            return -deficit * 10f;  // 음수 반환 (강한 페널티)
+            return -deficit * 3f;  // 음수 반환
         }
         return 0f;
     }
@@ -1091,25 +823,12 @@ public class BipedalAgent_v3 : Agent {
     }
 
     private float RewardFeetSpacing() {
-        Vector3 lPos = baseLink.transform.InverseTransformPoint(leftAnkleRoll.transform.position);
-        Vector3 rPos = baseLink.transform.InverseTransformPoint(rightAnkleRoll.transform.position);
-        float spaceFoot = Mathf.Abs(lPos.x - rPos.x); // 로컬 X 간격
+        float leftX = leftAnkleRoll.transform.position.x;
+        float rightX = rightAnkleRoll.transform.position.x;
+        float spaceFoot = Mathf.Abs(leftX - rightX);
         float error = Mathf.Abs(spaceFoot - target_spaceFoot);
 
         return Mathf.Exp(-error * 20f);
-    }
-
-    private float RewardJointLimit() {
-        float penalty = 0f;
-        // Hip Roll 과도하게 벌어짐 방지 (좌우 대칭)
-        float leftRoll = leftHipRoll.jointPosition[0] * Mathf.Rad2Deg;
-        float rightRoll = rightHipRoll.jointPosition[0] * Mathf.Rad2Deg;
-        
-        float threshold = 8f;
-        if(Mathf.Abs(leftRoll) > threshold) penalty += Mathf.Abs(leftRoll) - threshold;
-        if(Mathf.Abs(rightRoll) > threshold) penalty += Mathf.Abs(rightRoll) - threshold;
-
-        return (-0.5f) * penalty;
     }
     // ===================================================================
     // ===== Debug Visualization ======
@@ -1127,7 +846,7 @@ public class BipedalAgent_v3 : Agent {
         foreach (var j in joints) {
             if (j != null) maxJointVel = Mathf.Max(maxJointVel, Mathf.Abs(j.jointVelocity[0]));
         }
-        //Debug.Log($"JointVel: {maxJointVel:F1}, AngVel: {baseLink.angularVelocity.magnitude:F1}, LinVel: {baseLink.linearVelocity.magnitude:F1}");
+        Debug.Log($"JointVel: {maxJointVel:F1}, AngVel: {baseLink.angularVelocity.magnitude:F1}, LinVel: {baseLink.linearVelocity.magnitude:F1}");
     }
 
 
