@@ -79,8 +79,9 @@ public class BipedalAgent_v3 : Agent {
     private Quaternion startRot;
     private float stopRadius = 0.5f;
     private float stopRadiusTight = 0.05f;
-    private float stopSpeedThreshold = 0.1f;
+    private float stopSpeedThreshold = 0.05f;
     private int currentPhase = 0;  // 현재 커리큘럼 단계
+    private float minDistToTarget;
     // ===================================================================
     // ===== Pose =====
     // ===================================================================
@@ -291,8 +292,8 @@ public class BipedalAgent_v3 : Agent {
 
                 //SMOOTHNESS
                 scale_action_smoothness = -0.2f;
-                scale_dof_vel = -54-4f;
-                scale_joint_limit = 2f;
+                scale_dof_vel = -5e-4f;
+                scale_joint_limit = 1f;
                 break;
         }
         Debug.Log($"현재 학습 단계: Phase {phase}, 목표속도: {targetWalkingSpeed} m/s, GaitPeriod: {m_GaitPeriod}s");
@@ -351,6 +352,8 @@ public class BipedalAgent_v3 : Agent {
         baseLink.linearVelocity = Vector3.zero;
         baseLink.angularVelocity = Vector3.zero;
         lastBaseVelocity = Vector3.zero;
+        // ===== Reset Minimum Distance =====
+        minDistToTarget = float.MaxValue;
         // ===== Reset Pose =====
         for (int i = 0; i < joints.Length; i++){
             if (joints[i] == null) continue;
@@ -547,10 +550,32 @@ public class BipedalAgent_v3 : Agent {
         totalReward += RewardDefaultJointPos() * scale_default_joint_pos;
         totalReward += RewardAnyFootLinfHeight() * scale_any_foot_linf_height;
         totalReward += RewardJointLimit() * scale_joint_limit;
-        // ===== 4. Stop reward =====
+        // ===== 4. Stop reward (Stable Stop) =====
         if (nearTarget) {
-            float stopReward = Mathf.Exp(-speed * 5f);
-            totalReward += stopReward * 2f;
+            // 4-1. 속도 0 (강력한 정지 유도: *5 -> *10, 가중치 2 -> 5)
+            float stopReward = Mathf.Exp(-speed * 10f);
+            totalReward += stopReward * 5f;
+            
+            // 4-2. 방향 유지 (회전 방지: Yaw 보상 활성화 및 강화)
+            totalReward += RewardYaw() * scale_yaw * 2f;
+
+            // 4-3. 흔들림 방지 (각속도 0)
+            float angVel = baseLink.angularVelocity.magnitude;
+            totalReward += Mathf.Exp(-angVel * 5f) * 3f;
+
+            // 4-4. 자세 복귀 (차렷 자세)
+            totalReward += RewardDefaultJointPos() * 3f;
+            
+            // 4-5. 발바닥 지면 밀착
+            totalReward += RewardGroundFeetFlat();
+
+            float distReward = Mathf.Exp(-distToTarget * 10f);
+            totalReward += distReward * 2f; 
+
+            float distChange = distToTarget - lastDistToTarget;
+            if(distChange > 0) {
+                totalReward -= distChange * 20f;
+            }
         }
 
         AddReward(totalReward);
@@ -567,7 +592,9 @@ public class BipedalAgent_v3 : Agent {
 
         // ===== 1. Success: stop at target =====
         if (distToTarget < stopRadiusTight && speed < stopSpeedThreshold) {
-            AddReward(20f);
+            float timeBonus = Mathf.Clamp01(1f - movementTimer / movementDuration);
+            float reward = 30f + timeBonus * 50f;
+            AddReward(reward);
             EndEpisode();
             return;
         }
@@ -605,6 +632,13 @@ public class BipedalAgent_v3 : Agent {
             EndEpisode();
             return;
         }
+        // ===== 4. Check Target Distance =====
+        if(distToTarget > minDistToTarget + 0.2f &&  minDistToTarget < 1f){
+            AddReward(-10f);
+            EndEpisode();
+            return;
+        }
+        minDistToTarget = Mathf.Min(minDistToTarget, distToTarget);
         lastDistToTarget = distToTarget;
     }
 

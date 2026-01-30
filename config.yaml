@@ -1,46 +1,67 @@
 behaviors:
-  BipedalAgent_v3:
+  BipedalAgent_v4:
     trainer_type: ppo
     hyperparameters:
       batch_size: 2048
       buffer_size: 20480
-      learning_rate: 0.0001
+      learning_rate: 0.0003
       beta: 0.005
       epsilon: 0.2
       lambd: 0.95
-      num_epoch: 5
+      num_epoch: 3
       learning_rate_schedule: linear
     network_settings:
       normalize: true
-      hidden_units: 512
+      hidden_units: 256
       num_layers: 3
     reward_signals:
       extrinsic:
         gamma: 0.99
         strength: 1.0
-    max_steps: 50000000       
-    time_horizon: 512
+    max_steps: 30000000
+    time_horizon: 1000
     summary_freq: 10000
-    checkpoint_interval: 50000000  
+    checkpoint_interval: 500000
+    keep_checkpoints: 5
 
 environment_parameters:
-  education_phase:
+  imitation_weight:
     curriculum:
-      - name: Phase_0_StartWalking
+      - name: Stage1_PureImitation
         completion_criteria:
           measure: progress
-          behavior: BipedalAgent_v3
+          behavior: BipedalAgent_v4
+          signal_smoothing: true
           min_lesson_length: 100
-          threshold: 0.25        # 12.5M 스텝 (50M의 25%)
-        value: 0.0
-        
-      - name: Phase_1_ImproveGait
+          threshold: 0.3        # 9M 스텝 (30M의 30%)
+        value: 1.0              # 완전한 모방학습
+
+      - name: Stage2_HighImitation
         completion_criteria:
           measure: progress
-          behavior: BipedalAgent_v3
+          behavior: BipedalAgent_v4
+          signal_smoothing: true
           min_lesson_length: 100
-          threshold: 0.45        # 22.5M 스텝까지 (추가 10M)
-        value: 1.0
-        
-      - name: Phase_2_TargetSpeed
-        value: 2.0               # 22.5M ~ 50M (나머지)
+          threshold: 0.5        # 15M 스텝까지 (6M 추가)
+        value: 0.8              # 높은 모방학습 비중
+
+      - name: Stage3_MediumImitation
+        completion_criteria:
+          measure: progress
+          behavior: BipedalAgent_v4
+          signal_smoothing: true
+          min_lesson_length: 100
+          threshold: 0.7        # 21M 스텝까지 (6M 추가)
+        value: 0.6              # 중간 모방학습 비중
+
+      - name: Stage4_LowImitation
+        completion_criteria:
+          measure: progress
+          behavior: BipedalAgent_v4
+          signal_smoothing: true
+          min_lesson_length: 100
+          threshold: 0.85       # 25.5M 스텝까지 (4.5M 추가)
+        value: 0.4              # 낮은 모방학습 비중
+
+      - name: Stage5_Generalization
+        value: 0.2              # 25.5M ~ 30M: 일반화 단계 (4.5M)

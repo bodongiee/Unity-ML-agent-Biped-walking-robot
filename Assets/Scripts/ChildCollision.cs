@@ -4,8 +4,11 @@ public class ChildCollision : MonoBehaviour {
     private BipedalAgent agent_v1;
     private BipedalAgent_v2 agent_v2;
     private BipedalAgent_v3 agent_v3;
+    private BipedalAgent_v4 agent_v4;
 
     private void Awake() {
+        agent_v4 = GetComponentInParent<BipedalAgent_v4>();
+        if (agent_v4 != null) return;
         // Try finding v3 first (Priority)
         agent_v3 = GetComponentInParent<BipedalAgent_v3>();
         if (agent_v3 != null) return;
@@ -22,6 +25,11 @@ public class ChildCollision : MonoBehaviour {
 //======================================================================================
     private void OnCollisionEnter(Collision collision) {
         if (collision.gameObject.CompareTag("Ground")) {
+            
+            if (agent_v4 != null) {
+                agent_v4.HandleGroundCollision();
+            }
+            else
             if (agent_v3 != null) {
                 agent_v3.HandleGroundCollision();
             }
