@@ -9,7 +9,7 @@ import time
 # Paths
 CUR_DIR = os.path.dirname(os.path.abspath(__file__))
 URDF_PATH = os.path.join(CUR_DIR, "bipedal_v3_stable.URDF")
-ACTIONS_DIR = os.path.join(CUR_DIR, "Actions")
+ACTIONS_DIR = os.path.join(CUR_DIR, "Actions_hard")
 
 def load_json_trajectory(json_path):
     print(f"Opening {json_path}...")

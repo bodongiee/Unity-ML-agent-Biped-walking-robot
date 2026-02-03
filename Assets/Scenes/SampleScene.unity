@@ -4789,7 +4789,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1705541541}
-  - component: {fileID: 1705541546}
   - component: {fileID: 1705541545}
   - component: {fileID: 1705541544}
   - component: {fileID: 1705541543}
@@ -4937,19 +4936,6 @@ ArticulationBody:
   m_Immovable: 0
   m_UseGravity: 1
   m_CollisionDetectionMode: 0
---- !u!114 &1705541546
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1705541540}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fba5fd74d37a6cf4284698624eb8f6aa, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  IsBaseLink: 0
 --- !u!1 &1719066714
 GameObject:
   m_ObjectHideFlags: 8
@@ -5733,6 +5719,7 @@ MonoBehaviour:
   Ground: {fileID: 623798367}
   standingSeqJsonPath: Assets/IL/Actions/standing.json
   startLfJsonPath: Assets/IL/Actions/trajectory_start_rf_support_step.json
+  startRfJsonPath: Assets/IL/Actions/trajectory_start_lf_support_step.json
   walkingLfJsonPath: Assets/IL/Actions/trajectory_extract_cycle_lf_start.json
   walkingRfJsonPath: Assets/IL/Actions/trajectory_extract_cycle_rf_start.json
   stopLfJsonPath: Assets/IL/Actions/trajectory_stop_rf_support_step.json
@@ -5740,14 +5727,21 @@ MonoBehaviour:
   useImitation: 1
   manualImitationWeight: 1
   debugMode: 1
+  useRSI: 1
+  rsiProbability: 0.8
+  graceSteps: 50
+  earlyTerminationThreshold: 0.5
+  startupFreezeSteps: 2
   actionScale: 60
   scale_imitation_pose: 10
   scale_imitation_velocity: 5
+  scale_com_tracking: 3
   scale_orientation: 3
   scale_base_height: 4
   scale_action_smoothness: -0.2
   scale_forward_progress: 1
   scale_stop_velocity: 5
+  rsiVelocityScale: 0.3
 --- !u!114 &2083859570
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5761,7 +5755,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_BrainParameters:
-    VectorObservationSize: 47
+    VectorObservationSize: 48
     NumStackedVectorObservations: 4
     m_ActionSpec:
       m_NumContinuousActions: 12

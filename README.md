@@ -1,5 +1,12 @@
 # Unity ML-agent Bipedal Robot Walking Project
+## Model Last (BipedalAgent_v4)
+### Reinforcement Learning + Imitation Learning
+
 ## Model 3 (BipedalAgent_3.onnx)
++ Pinocchio and Crocoddyl were used to generate a reference trajectory for the robot’s walking motion.
+
+
+
 
 <img src="./Images/model3.gif" width="100%"></img>
 

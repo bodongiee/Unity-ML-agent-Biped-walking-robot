@@ -1,6 +1,6 @@
 import numpy as np
 import json
-file = 'walking_trajectory_safe.npy'
+file = 'walking_trajectory_fix_com.npy'
 # Parameters
 step_length = 0.15   
 step_height = 0.05  
@@ -9,7 +9,7 @@ dt = 0.01
 T_init = 0.8            # 초기 안정화
 T_shift = 0.6           # Weight shift
 T_swing = 0.8           # Swing phase
-T_ds = 0.4              # Double support
+T_ds = 0.8              # Double support
 
 # Steps
 num_steps = 5
