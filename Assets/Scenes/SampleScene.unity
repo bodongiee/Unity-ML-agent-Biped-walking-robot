@@ -3278,7 +3278,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1092779179}
-  - component: {fileID: 1092779182}
   - component: {fileID: 1092779181}
   - component: {fileID: 1092779180}
   m_Layer: 0
@@ -3390,19 +3389,6 @@ ArticulationBody:
   m_Immovable: 0
   m_UseGravity: 1
   m_CollisionDetectionMode: 0
---- !u!114 &1092779182
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1092779178}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fba5fd74d37a6cf4284698624eb8f6aa, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  IsBaseLink: 0
 --- !u!1 &1096361833
 GameObject:
   m_ObjectHideFlags: 0
@@ -5727,12 +5713,9 @@ MonoBehaviour:
   useImitation: 1
   manualImitationWeight: 1
   debugMode: 1
-  useRSI: 1
-  rsiProbability: 0.8
   graceSteps: 50
   earlyTerminationThreshold: 0.5
-  startupFreezeSteps: 2
-  actionScale: 60
+  actionScale: 15
   scale_imitation_pose: 10
   scale_imitation_velocity: 5
   scale_com_tracking: 3
@@ -5741,7 +5724,7 @@ MonoBehaviour:
   scale_action_smoothness: -0.2
   scale_forward_progress: 1
   scale_stop_velocity: 5
-  rsiVelocityScale: 0.3
+  scale_trajectory_direction: 2
 --- !u!114 &2083859570
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5755,8 +5738,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_BrainParameters:
-    VectorObservationSize: 48
-    NumStackedVectorObservations: 4
+    VectorObservationSize: 60
+    NumStackedVectorObservations: 3
     m_ActionSpec:
       m_NumContinuousActions: 12
       BranchSizes: 01000000

@@ -9,7 +9,7 @@ behaviors:
       epsilon: 0.2              # 0.1 -> 0.2 (초기 탐색 강화)
       lambd: 0.95
       num_epoch: 3
-      learning_rate_schedule: linear # constant -> linear (후반 미세 조정을 위해)
+      learning_rate_schedule: linear 
     network_settings:
       normalize: true
       hidden_units: 512
@@ -18,8 +18,8 @@ behaviors:
       extrinsic:
         gamma: 0.99
         strength: 1.0
-    max_steps: 30000000
-    time_horizon: 256           # 1000 -> 256 (반응성 향상 및 학습 안정화)
+    max_steps: 31000000
+    time_horizon: 256           
     summary_freq: 10000
     checkpoint_interval: 5000000000
     keep_checkpoints: 5
@@ -27,8 +27,6 @@ behaviors:
 environment_parameters:
   imitation_weight:
     curriculum:
-      # Residual Control을 사용하므로 Weight를 줄일 필요가 없음 (항상 1.0 유지 추천)
-      # 이 Weight는 이제 '보상'의 크기에만 영향을 미침
       - name: ConstantRewardWeight
         completion_criteria:
           measure: progress

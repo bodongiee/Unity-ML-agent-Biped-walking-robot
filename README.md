@@ -1,18 +1,41 @@
 # Unity ML-agent Bipedal Robot Walking Project
 ## Model Last (BipedalAgent_v4)
 ### Reinforcement Learning + Imitation Learning
+<div style = "text-align : center;">
+    <img src="./Images/panel_a_architecture.jpg" width = "49.4%"></img>
+    <img src="./Images/panel_b_state_machine.jpg" width = "49.4%"></img>
+</div>
+<div style = "text-align : center;">
+    <img src="./Images/panel_c_observations.jpg" width = "49.4%"></img>
+    <img src="./Images/panel_d_rewards.jpg" width = "49.4%"></img>
+</div>
+
+### Pinocchio and Crocoddyl were used to generate a reference trajectory for the robot’s walking motion.
++ Reference Motions are located at Assets/IL/Actions, Assets/IL/Actions_hard
+    + `trajectory_start_lf_support_step.json` : Start movement from standing pose by right foot step
+    + `trajectory_start_rf_support_step.json` : Start movement from standing pose by left foot step
+    + `trajectory_stop_lf_support_step.json` : Finish movement from walking pose by right last foot step
+    + `trajectory_stop_lf_support_step.json` : Finish movement from walking pose by left last foot step
+    + `trajectory_extract_cycle_lf_start.json` : Walking Cycle (DS -> RS -> DS -> LS -> DS)
+    + `trajectory_extract_cycle_rf_start.json` : Walking Cycle (DS -> RS -> DS -> LS -> DS)
+    + `trajectory_extract_cycle_lf_start_98.json` : Walking Cycle (More Shift, DS -> RS -> DS -> LS -> DS)
+    + `trajectory_extract_cycle_rf_start_98.json` : Walking Cycle (More Shift, DS -> LS -> DS -> RS -> DS)
+
+<div style="text-align: center;">
+    <img src="./Images/standing.gif" width= "24.7%"></img>
+    <img src="./Images/walking.gif" width= "24.7%"></img>
+    <img src="./Images/start.gif" width= "24.7%"></img>
+    <img src="./Images/finish.gif" width= "24.7%"></img>
+</div>
+
+Reference motion of standing, walking, start, finish
 
 ## Model 3 (BipedalAgent_3.onnx)
-+ Pinocchio and Crocoddyl were used to generate a reference trajectory for the robot’s walking motion.
-
-
-
-
 <img src="./Images/model3.gif" width="100%"></img>
 
 <div style="text-align: center;">
-    <img src="./Images/URDF1.png" width="49%" />
-    <img src="./Images/URDF2.png" width="49%" />
+    <img src="./Images/URDF1.png" width="49.4%" />
+    <img src="./Images/URDF2.png" width="49.4%" />
 </div>
 
 
