@@ -2,12 +2,12 @@
 ## Model Last (BipedalAgent_v4)
 ### Reinforcement Learning + Imitation Learning
 <div style = "text-align : center;">
-    <img src="./Images/panel_a_architecture.jpg" width = "49.4%"></img>
-    <img src="./Images/panel_b_state_machine.jpg" width = "49.4%"></img>
+    <img src="./Images/panel_a_architecture.jpg" width = "49%"></img>
+    <img src="./Images/panel_b_state_machine.jpg" width = "49%"></img>
 </div>
 <div style = "text-align : center;">
-    <img src="./Images/panel_c_observations.jpg" width = "49.4%"></img>
-    <img src="./Images/panel_d_rewards.jpg" width = "49.4%"></img>
+    <img src="./Images/panel_c_observations.jpg" width = "49%"></img>
+    <img src="./Images/panel_d_rewards.jpg" width = "49%"></img>
 </div>
 
 ### Pinocchio and Crocoddyl were used to generate a reference trajectory for the robot’s walking motion.
@@ -22,10 +22,10 @@
     + `trajectory_extract_cycle_rf_start_98.json` : Walking Cycle (More Shift, DS -> LS -> DS -> RS -> DS)
 
 <div style="text-align: center;">
-    <img src="./Images/standing.gif" width= "24.7%"></img>
-    <img src="./Images/walking.gif" width= "24.7%"></img>
-    <img src="./Images/start.gif" width= "24.7%"></img>
-    <img src="./Images/finish.gif" width= "24.7%"></img>
+    <img src="./Images/standing.gif" width= "24%"></img>
+    <img src="./Images/walking.gif" width= "24%"></img>
+    <img src="./Images/start.gif" width= "24%"></img>
+    <img src="./Images/finish.gif" width= "24%"></img>
 </div>
 
 Reference motion of standing, walking, start, finish
@@ -34,8 +34,8 @@ Reference motion of standing, walking, start, finish
 <img src="./Images/model3.gif" width="100%"></img>
 
 <div style="text-align: center;">
-    <img src="./Images/URDF1.png" width="49.4%" />
-    <img src="./Images/URDF2.png" width="49.4%" />
+    <img src="./Images/URDF1.png" width="49%" />
+    <img src="./Images/URDF2.png" width="49%" />
 </div>
 
 
