@@ -5716,9 +5716,11 @@ MonoBehaviour:
   graceSteps: 50
   earlyTerminationThreshold: 0.5
   actionScale: 15
+  playbackMode: 0
   scale_imitation_pose: 10
   scale_imitation_velocity: 5
   scale_com_tracking: 3
+  scale_yaw: 15
   scale_orientation: 3
   scale_base_height: 4
   scale_action_smoothness: -0.2
@@ -5747,7 +5749,7 @@ MonoBehaviour:
     VectorActionDescriptions: []
     VectorActionSpaceType: 0
     hasUpgradedBrainParametersWithActionSpec: 1
-  m_Model: {fileID: 0}
+  m_Model: {fileID: 5022602860645237092, guid: 0068813e66291a941a6b489085b3411e, type: 3}
   m_InferenceDevice: 0
   m_BehaviorType: 0
   m_BehaviorName: BipedalAgent_v4

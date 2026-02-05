@@ -1,6 +1,11 @@
 # Unity ML-agent Bipedal Robot Walking Project
 ## Model Last (BipedalAgent_v4)
 ### Reinforcement Learning + Imitation Learning
+<img src="./Images/model4.gif" width="100%"></img>
+
+<img src="./Images/model4_1.gif" width="100%"></img>
+
+### Model Information
 <div style = "text-align : center;">
     <img src="./Images/panel_a_architecture.jpg" width = "49%"></img>
     <img src="./Images/panel_b_state_machine.jpg" width = "49%"></img>
